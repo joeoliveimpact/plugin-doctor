@@ -1,0 +1,37 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "plugin-doctor",
+  "description": "Standalone marketplace for plugin-doctor — the one-command repair tool for Claude plugins stuck on an old version or failing the in-app directory install (404).",
+  "owner": {
+    "name": "Joe Olive",
+    "email": "joe@engineforimpact.com"
+  },
+  "metadata": {
+    "version": "0.1.2"
+  },
+  "plugins": [
+    {
+      "name": "plugin-doctor",
+      "description": "Fixes stalled Claude plugin updates. Diagnoses whether a plugin is stuck on an old version or hitting the in-app directory 404, then fixes it: runs the staged, reversible marketplace-updater script for you (or walks the manual fix), with config-safety guarantees — your plugin data and brand config are never touched. One command: /plugin-doctor.",
+      "source": "./",
+      "category": "productivity",
+      "version": "0.1.2",
+      "author": {
+        "name": "Joe Olive",
+        "email": "joe@engineforimpact.com"
+      },
+      "homepage": "https://github.com/joeoliveimpact/plugin-doctor",
+      "license": "MIT",
+      "keywords": [
+        "plugin",
+        "update",
+        "fix",
+        "doctor",
+        "troubleshooting",
+        "install",
+        "marketplace",
+        "utility"
+      ]
+    }
+  ]
+}
