@@ -7,7 +7,7 @@
     "email": "joe@engineforimpact.com"
   },
   "metadata": {
-    "version": "0.1.2"
+    "version": "0.2.0"
   },
   "plugins": [
     {
@@ -15,7 +15,7 @@
       "description": "Fixes stalled Claude plugin updates. Diagnoses whether a plugin is stuck on an old version or hitting the in-app directory 404, then fixes it: runs the staged, reversible marketplace-updater script for you (or walks the manual fix), with config-safety guarantees — your plugin data and brand config are never touched. One command: /plugin-doctor.",
       "source": "./",
       "category": "productivity",
-      "version": "0.1.2",
+      "version": "0.2.0",
       "author": {
         "name": "Joe Olive",
         "email": "joe@engineforimpact.com"

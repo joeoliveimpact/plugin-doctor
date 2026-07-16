@@ -2,6 +2,22 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0] — 2026-07-16
+
+### Fixed
+- **Stall A was clearing the wrong data store.** Field failure (07.16.26): the updater
+  script cleared the Desktop display cache (IndexedDB), but the version that actually
+  loads is pinned in `~/.claude/plugins/installed_plugins.json` (the plugin registry) —
+  which the script never touched. Plugins stayed old while the fix reported success.
+
+### Changed
+- **Stall A rewritten around the two layers** (version registry vs. display cache).
+  First-line fix is now the `claude` CLI: `claude plugin marketplace update` +
+  `claude plugin update <plugin>@<marketplace>` — verified to unpin the registry
+  instantly. The updater script (v1.1+, which now also runs the registry update when
+  the CLI is present) and the uninstall → full-quit → reinstall UI path remain for
+  Desktop-only users.
+
 ## [0.1.2] — 2026-07-07
 
 ### Changed

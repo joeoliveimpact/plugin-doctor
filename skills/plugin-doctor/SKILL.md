@@ -22,14 +22,28 @@ Then route:
 
 Plugin settings, story banks, and brand config live OUTSIDE the plugin's install folder — in `${CLAUDE_PLUGIN_DATA}` and (for REVXL engines) the shared `~/.claude/revxl/` folder. Uninstall/reinstall does not touch them. Belt-and-suspenders: before fixing, copy `~/.claude/revxl/` to a temp backup anyway; restore only if something looks off after.
 
-## Stall A — stuck on an old version (force-refresh)
+## Stall A — stuck on an old version (two layers; know which one you're fixing)
 
-**Fastest fix — run the updater script (works from Claude Desktop chat or Claude Code):**
-A staged, fully reversible cache-clear script lives at
-https://github.com/joeoliveimpact/Claude-marketplace-updater. Before running it, tell the
-user what to expect: **Claude Desktop will quit and reopen mid-fix** — their chat survives;
-they reopen it afterward and everything is right where they left it. Then download and
-launch it **detached** (own process, so it survives the restart):
+A stuck update lives in one or both of two places:
+
+- **Layer 1 — the version registry:** `~/.claude/plugins/installed_plugins.json`. This file decides which version actually LOADS. It is the usual culprit: the new version is often already downloaded into `~/.claude/plugins/cache/<marketplace>/<plugin>/` while the registry still points at the old folder.
+- **Layer 2 — the Desktop display cache** (IndexedDB under the Claude app-data folder). This only affects what the plugins panel SHOWS. Clearing it does NOT unpin Layer 1 — a cache clear alone can report success while the plugin stays old (field-verified 07.16.26).
+
+**First-line fix — the `claude` CLI (use whenever a shell is available, including a Claude Desktop chat that can run commands):**
+1. Refresh the marketplace listing: `claude plugin marketplace update <marketplace-name>` (if that errors, `claude plugin marketplace remove <marketplace-name>` then re-add it). Example: `claude plugin marketplace update revxl-marketplace`.
+2. Unpin the registry: `claude plugin update <plugin-name>@<marketplace-name>` — it reports `updated from X to Y`.
+3. Verify: `claude plugin list` shows the new version. Restart Claude (or open a fresh session) to load it.
+
+If `claude plugin update` says it's already on the latest but behavior is still old, the session is holding the old load — a fresh session/restart is the fix, not more clearing.
+
+**Script fix — Claude Desktop without CLI access:**
+A staged, fully reversible fixer lives at
+https://github.com/joeoliveimpact/Claude-marketplace-updater (v1.1+ clears the display
+cache AND runs the registry update automatically when the `claude` CLI is installed).
+Before running it, tell the user what to expect: **Claude Desktop will quit and reopen
+mid-fix** — their chat survives; they reopen it afterward and everything is right where
+they left it. Then download and launch it **detached** (own process, so it survives the
+restart):
 
 - macOS:
   `curl -fsSL https://raw.githubusercontent.com/joeoliveimpact/Claude-marketplace-updater/main/fix-marketplace-sync-macos.command -o /tmp/cmu.command`
@@ -39,20 +53,14 @@ launch it **detached** (own process, so it survives the restart):
   then `Start-Process "$env:TEMP\cmu.bat" -ArgumentList '--stage1'`
 
 After Claude reopens: verify the plugin version (Settings → Plugins; macOS log at
-`/tmp/cmu-updater.log`). Still on the old version? Re-run the same way with `--stage2`
-(full local reset — bigger clear, still reversible, user re-logs-in). If the script can't
-be fetched (offline, blocked), use the manual fallbacks below.
+`/tmp/cmu-updater.log`). Still old? Re-run with `--stage2` (full local reset — bigger
+clear, still reversible, user re-logs-in).
 
-**Manual fallback — Claude Code (CLI available):**
-1. Refresh the marketplace listing: `claude plugin marketplace update <marketplace-name>` (if that errors, `claude plugin marketplace remove <marketplace-name>` then re-add it). Example: `claude plugin marketplace update revxl-marketplace`.
-2. Force-reinstall the plugin: `claude plugin uninstall <plugin-name>` then `claude plugin install <plugin-name>@<marketplace-name>`.
-3. Verify: `claude plugin list` shows the new version; a new session shows the new commands.
-
-**Manual fallback — Claude Desktop (no CLI):** walk the user through the same thing in the UI, one step at a time:
+**No CLI at all (Desktop-only, script didn't stick):** uninstall/reinstall via the UI — this rewrites the registry entry, so it fixes Layer 1 without a terminal:
 1. Open the plugins/extensions panel → find the plugin → uninstall it.
-2. Fully quit and reopen Claude Desktop (clears the stale listing — this is the step people skip; a known Desktop sync bug makes updates stick until restart).
+2. **Fully quit** and reopen Claude Desktop (the step people skip; a known Desktop sync bug makes updates stick until restart).
 3. Reinstall the plugin from the directory.
-4. Verify the version in the panel and check a new chat for the new commands.
+4. Verify the version in the panel and check a NEW chat for the new commands.
 
 ## Stall B — in-app install 404 (`plugin_<id>` not found)
 
