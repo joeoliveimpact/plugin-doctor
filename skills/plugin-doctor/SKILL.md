@@ -5,18 +5,32 @@ description: Diagnose and fix a Claude plugin that is stuck on an old version, w
 
 # Plugin Doctor — fix stalled plugin updates
 
-A plugin "stalls" two ways. Diagnose which one first; the fixes are different.
+A plugin "stalls" three ways. Diagnose which one first; the fixes are completely different, and **one of them has no local fix at all** — recognising that early saves an hour of pointless clearing.
 
 ## Step 0 — Diagnose
 
-Ask (or check) three things:
-1. **Which plugin**, and what marketplace it came from — ask the user for both, don't assume. The marketplace is the `@<marketplace>` suffix they used at install (e.g. `plugin-doctor`, `revxl-marketplace`, or whatever they added); if they don't know it, `claude plugin list` shows each plugin's marketplace.
-2. **Installed version:** Claude Code → run `claude plugin list` and read the version. Claude Desktop → open the plugins/extensions panel and read the version shown.
-3. **Latest published version:** check the marketplace catalog — the plugin's CHANGELOG in its source repo. (Example: a revxl-marketplace plugin's CHANGELOG lives at https://github.com/joeoliveimpact/revxl-marketplace/tree/main/plugins/.)
+**First, find out WHICH STORE the plugin loads from. There are three, and they are independent.**
+
+| Store | Where | Who loads it |
+|---|---|---|
+| CLI registry | `~/.claude/plugins/installed_plugins.json` + `cache/` | Claude Code CLI, Desktop **Code tab** |
+| **Cowork / agent-mode** | `%APPDATA%\Claude\local-agent-mode-sessions\<id>\rpm\plugin_<id>\` (macOS: `~/Library/Application Support/Claude/...`) | Desktop **Cowork tab** |
+| Display cache | IndexedDB in the Claude app-data folder | the plugins panel only |
+
+Check both real stores — **they disagree, and either one can be the stale one**:
+- CLI: `claude plugin list`
+- Cowork: read `rpm/manifest.json` for the plugin's name. If it appears there, Cowork has its **own** copy that the CLI cannot touch, and **the Cowork copy shadows the CLI one**.
+
+Then ask:
+1. **Which plugin**, and what marketplace it came from — ask, don't assume. `claude plugin list` shows each plugin's marketplace.
+2. **Latest published version:** the plugin's CHANGELOG in its source repo, or the local catalog at `~/.claude/plugins/marketplaces/<marketplace>/.claude-plugin/marketplace.json`.
 
 Then route:
-- Installed < latest, and updating does nothing → **Stall A** (stuck update).
-- Fresh install from the in-app directory fails with `404 Not Found: plugin_<id>` → **Stall B** (hosted-directory record issue).
+- In the CLI store, installed < latest, updating does nothing → **Stall A** (registry pin).
+- Fresh install from the in-app directory fails with `404 Not Found: plugin_<id>` → **Stall B** (hosted-record issue).
+- Plugin is listed in Cowork's `rpm/manifest.json` and stays old no matter what you run locally → **Stall C** (server-side snapshot). Do not attempt local fixes; go straight to Stall C.
+
+**Fast check for the most common Stall A signature** — the registry pointing at an old folder while the new one is already downloaded. Compare each entry's `installPath` in `installed_plugins.json` against the directories actually present in `cache/<marketplace>/<plugin>/`. A newer directory sitting there unused (especially one carrying an `.orphaned_at` marker) IS the diagnosis, in one read.
 
 ## Your config is safe (say this up front)
 
@@ -53,8 +67,16 @@ restart):
   then `Start-Process "$env:TEMP\cmu.bat" -ArgumentList '--stage1'`
 
 After Claude reopens: verify the plugin version (Settings → Plugins; macOS log at
-`/tmp/cmu-updater.log`). Still old? Re-run with `--stage2` (full local reset — bigger
-clear, still reversible, user re-logs-in).
+`/tmp/cmu-updater.log`).
+
+**Never escalate to `--stage2`.** It renames the entire Claude app-data folder
+(`%APPDATA%\Claude` / `~/Library/Application Support/Claude`), which today also holds
+`claude_desktop_config.json` (local MCP server config), the **Cowork plugin store**, and
+the running Claude Code executable. On Windows it aborts on the open file handle with a
+misleading "close Claude fully and re-run"; if it ever succeeded it would strand every
+Desktop plugin and take local MCP config with it — the script's own promise that MCP
+servers return after re-login is false for local config. Still old after stage 1? Go to
+the uninstall/reinstall path below, or to Stall C if the plugin is Cowork-installed.
 
 **No CLI at all (Desktop-only, script didn't stick):** uninstall/reinstall via the UI — this rewrites the registry entry, so it fixes Layer 1 without a terminal:
 1. Open the plugins/extensions panel → find the plugin → uninstall it.
@@ -69,6 +91,18 @@ The repo is fine; the HOSTED directory record is orphaned. Two moves:
 2. **Report it:** the marketplace owner needs to republish (a version-bump re-index) or escalate to Anthropic. Tell the user to report the exact `plugin_<id>` string and which plugin/version they tried.
 
 Claude Desktop users who hit a 404 and can't use the CLI: report it (step 2) — the republish fix is on the publisher's side, usually same-day.
+
+## Stall C — Cowork plugin frozen at an old version (no local fix exists)
+
+**Symptom:** the plugin appears in Cowork's `rpm/manifest.json`, the Cowork tab keeps loading an old version, and nothing local moves it — not `claude plugin update`, not clearing caches, not deleting the `rpm` folder, not a full quit, not remove-and-re-add in the panel. The panel's Update button may be permanently greyed out.
+
+**Cause (server-side, upstream bug — [#69683](https://github.com/anthropics/claude-code/issues/69683), open):** for marketplaces registered through Cowork, Anthropic's backend snapshots the GitHub repo at registration time and never re-pulls. The client is told "0 to download" and believes it is current. Removing and re-adding the marketplace is **deduplicated server-side** — the same marketplace id comes back, so the stale snapshot survives. Uninstall/reinstall rewrites files with fresh timestamps but the **same old content**.
+
+Tell the user plainly: *"This one is on Anthropic's side. Nothing on your computer can fix it — the old copy is being served to you."* Do not burn their time on local clearing.
+
+**The one remedy that works** ([#74609](https://github.com/anthropics/claude-code/issues/74609)): **remove the plugin from Cowork** (Customize → Skills → remove). With the Cowork copy gone, agent mode falls back to the CLI-installed copy, which you *can* update via Stall A. Re-adding it in Cowork re-enables the stale channel — so leave it removed.
+
+**Diagnostic worth capturing** before removing: a manifest entry missing `updatedAtVerified` while its siblings have it is a strong marker of an orphaned snapshot. Note the `marketplaceName` too — if it names a marketplace whose catalog no longer lists that plugin, the snapshot predates the catalog change and is provably stale.
 
 ## After any fix
 

@@ -2,6 +2,18 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] — 2026-08-04
+
+### Removed
+- **The `--stage2` escalation, on safety grounds.** Stage 2 renames the entire Claude app-data folder (`%APPDATA%\Claude` / `~/Library/Application Support/Claude`). That folder now also holds `claude_desktop_config.json` (local MCP server config), the **Cowork plugin store**, Claude Code session data, and the running Claude Code executable. On Windows it aborts on the open file handle with a misleading "close Claude fully and re-run"; had it succeeded it would have stranded every Desktop plugin and taken local MCP config with it — while the script promises MCP servers return after re-login, which is false for local config.
+
+### Added
+- **Stall C — Cowork plugin frozen at an old version.** Plugins installed through the Cowork/Customize panel live in a **third store** (`local-agent-mode-sessions/<id>/rpm/plugin_<id>/`) that no local command can reach, and the Cowork copy **shadows** the CLI copy. Anthropic's backend snapshots the marketplace repo at registration and never re-pulls ([#69683](https://github.com/anthropics/claude-code/issues/69683), open), and remove-and-re-add is deduplicated server-side so it does not reset the snapshot. The only working remedy is to remove the plugin from Cowork so agent mode falls back to the CLI copy ([#74609](https://github.com/anthropics/claude-code/issues/74609)). Previously this class of stall was misdiagnosed as Stall A and sent users through local fixes that could never work.
+- **One-read Stall A detection:** compare each registry `installPath` against the directories actually present in `cache/<marketplace>/<plugin>/`. A newer unused directory — especially one carrying an `.orphaned_at` marker — is the diagnosis. Neither this skill nor the updater script had any detection step before; both went straight to blind remediation.
+
+### Changed
+- **Step 0 now identifies which of the three stores the plugin loads from before doing anything.** The previous flow read one version number and treated it as authoritative; in practice the CLI registry and the Cowork store disagree, and either can be the stale one (observed live: Cowork current at 0.8.2 while the CLI registry sat pinned at 0.8.1).
+
 ## [0.2.0] — 2026-07-16
 
 ### Fixed
